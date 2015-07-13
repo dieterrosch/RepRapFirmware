@@ -87,7 +87,6 @@ class GCodes
     void DeleteFile(const char* fileName);								// Does what it says
     bool GetProbeCoordinates(int count, float& x, float& y, float& z) const;	// Get pre-recorded probe coordinates
     void GetCurrentCoordinates(StringRef& s) const;						// Write where we are into a string
-    bool PrintingAFile() const;											// Are we in the middle of printing a file?
     bool DoingFileMacro() const;										// Or still busy processing a macro file?
     float FractionOfFilePrinted() const;								// Get fraction of file printed
     void Diagnostics();													// Send helpful information out
@@ -113,7 +112,7 @@ class GCodes
     void DoFilePrint(GCodeBuffer* gb, StringRef& reply);				// Get G Codes from a file and print them
     bool AllMovesAreFinishedAndMoveBufferIsLoaded();					// Wait for move queue to exhaust and the current position is loaded
     bool DoCannedCycleMove(EndstopChecks ce);							// Do a move from an internally programmed canned cycle
-    void DoFileMacro(const char* fileName);								// Run a GCode macro in a file, error if not found
+    bool DoFileMacro(const char* fileName, bool reportMissing = true);	// Run a GCode macro in a file, optionally report error if not found
     void FileMacroCyclesReturn();										// End a macro
     bool ActOnCode(GCodeBuffer* gb, StringRef& reply);					// Do a G, M or T Code
     bool HandleGcode(GCodeBuffer* gb, StringRef& reply);				// Do a G code
@@ -219,11 +218,6 @@ class GCodes
 };
 
 //*****************************************************************************************************
-
-inline bool GCodes::PrintingAFile() const
-{
-	return FractionOfFilePrinted() >= 0.0;
-}
 
 inline bool GCodes::DoingFileMacro() const
 {

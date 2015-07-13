@@ -454,10 +454,10 @@ void DDA::CalcNewSpeeds()
 					maxDeltaV *= 0.8;
 					if ((thisMoveFraction >= 0.0) == (nextMoveFraction >= 0.0))
 					{
-						// Drives moving in the same direction, so we must reduce the faster one
+						// Drive moving in the same direction for this move and the next one, so we must reduce speed of the faster one
 						if (fabsf(thisMoveSpeed) > fabsf(nextMoveSpeed))
 						{
-							endSpeed = fabsf((nextMoveSpeed) + maxDeltaV)/fabsf(thisMoveFraction);
+							endSpeed = (fabsf(nextMoveSpeed) + maxDeltaV)/fabsf(thisMoveFraction);
 						}
 						else
 						{
@@ -518,7 +518,7 @@ void DDA::SetPositions(const float move[DRIVES])
 
 // Get a Cartesian end coordinate from this move
 float DDA::GetEndCoordinate(size_t drive, bool disableDeltaMapping)
-//pre(drive < AXES)
+//pre(disableDeltaMapping || drive < AXES)
 {
 	if (disableDeltaMapping)
 	{
@@ -567,6 +567,8 @@ void DDA::Prepare()
 	params.compFactor = 1.0 - startSpeed/topSpeed;
 
 	firstStepTime = DriveMovement::NoStepTime;
+	goingSlow = false;
+
 	for (size_t drive = 0; drive < DRIVES; ++drive)
 	{
 		DriveMovement& dm = ddm[drive];
@@ -736,7 +738,7 @@ bool DDA::Step()
 				break;
 
 			case EndStopHit::lowNear:
-				ReduceHomingSpeed(reprap.GetPlatform()->ConfiguredInstantDv(Z_AXIS));
+				ReduceHomingSpeed();
 				break;
 
 			default:
@@ -788,7 +790,7 @@ bool DDA::Step()
 							// This allows us to home X and Y simultaneously.
 							if (endStopsToCheck == (1 << drive))
 							{
-								ReduceHomingSpeed(reprap.GetPlatform()->ConfiguredInstantDv(drive));
+								ReduceHomingSpeed();
 							}
 							break;
 
@@ -842,7 +844,7 @@ void DDA::StopDrive(size_t drive)
 	DriveMovement& dm = ddm[drive];
 	if (dm.moving)
 	{
-		int32_t stepsLeft = dm.totalSteps - dm.nextStep;
+		int32_t stepsLeft = dm.totalSteps - dm.nextStep + 1;
 		if (dm.direction)
 		{
 			endPoint[drive] -= stepsLeft;			// we were going forwards
@@ -870,12 +872,13 @@ void DDA::MoveAborted(uint32_t clocksFromStart)
 // Reduce the speed of this move to the indicated speed.
 // This is called from the ISR, so interrupts are disabled and nothing else can mess with us.
 // As this is only called for homing moves and with very low speeds, we assume that we don't need acceleration or deceleration phases.
-void DDA::ReduceHomingSpeed(float newSpeed)
+void DDA::ReduceHomingSpeed()
 {
-	if (newSpeed < topSpeed)
+	if (!goingSlow)
 	{
-		const float factor = topSpeed/newSpeed;				// the factor by which we are reducing the speed
-		topSpeed = newSpeed;
+		goingSlow = true;
+		const float factor = 3.0;				// the factor by which we are reducing the speed
+		topSpeed /= factor;
 		for (size_t drive = 0; drive < DRIVES; ++drive)
 		{
 			DriveMovement& dm = ddm[drive];
